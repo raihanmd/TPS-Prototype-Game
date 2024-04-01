@@ -1,44 +1,55 @@
+using System;
 using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour {
-	[SerializeField] private float rotationSpeed = 5f;
-	[SerializeField] private Transform cameraTransform;
-	[SerializeField] private CharacterController controller;
+	[SerializeField] private float moveSpeed;
+	[SerializeField] private float groundYOffset;
+	[SerializeField] private LayerMask groundmask;
+	[SerializeField] private float gravity = -9.81f;
 
+	[HideInInspector] public Vector3 direction;
+	private CharacterController controller;
+	private float hInput, vInput;
 	private Animator animator;
-	private Vector3 movement;
-	private float moveSpeed;
+	private Vector3 spherePos, velocity;
 
-	void Start() {
+	private void Start() {
 		animator = GetComponent<Animator>();
+		controller = GetComponent<CharacterController>();
 	}
 
-	void Update() {
-		float moveHorizontal = Input.GetAxis("Horizontal");
-		float moveVertical = Input.GetAxis("Vertical");
+	private void Update() {
+		GetDirectionAndMove();
+		Gravity();
+	}
 
-		Vector3 cameraForward = cameraTransform.forward;
-		Vector3 cameraRight = cameraTransform.right;
+	private void GetDirectionAndMove() {
+		hInput = Input.GetAxis("Horizontal");
+		vInput = Input.GetAxis("Vertical");
 
-		cameraForward.y = 0;
-		cameraRight.y = 0;
+		direction = transform.forward * vInput + transform.right * hInput;
 
-		cameraForward.Normalize();
-		cameraRight.Normalize();
+		animator.SetFloat("speed", moveSpeed * Math.Abs(vInput));
 
-		movement = moveVertical * cameraForward + moveHorizontal * cameraRight;
-		movement = Vector3.ClampMagnitude(movement, 1f);
+		controller.Move(moveSpeed * Time.deltaTime * direction);
+	}
 
-		moveSpeed = Input.GetKey(KeyCode.LeftShift) ? 7f : 4f;
+	private bool IsGrounded() {
+		spherePos = new Vector3(transform.position.x, transform.position.y - groundYOffset, transform.position.z);
+		return Physics.CheckSphere(spherePos, controller.radius - .05f, groundmask);
+	}
 
-		float speed = movement.magnitude;
-		animator.SetFloat("speed", speed * moveSpeed);
+	private void Gravity() {
+		if (!IsGrounded()) velocity.y += gravity * Time.deltaTime;
+		else if (velocity.y < 0) velocity.y = -2;
 
-		if (movement != Vector3.zero) {
-			Quaternion targetRotation = Quaternion.LookRotation(movement);
-			transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+		controller.Move(velocity * Time.deltaTime);
+	}
+
+	private void OnDrawGizmos() {
+		if (controller != null) {
+			Gizmos.color = Color.red;
+			Gizmos.DrawWireSphere(spherePos, controller.radius - .05f);
 		}
-		controller.Move(moveSpeed * Time.deltaTime * movement);
 	}
-
 }
